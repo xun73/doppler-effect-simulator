@@ -65,7 +65,6 @@ $$f' = f_0 \cdot \frac{v}{v - v_r}$$
 
 ```
 ├── index.htm          # 主程式（最新版本）
-├── doppler7.htm       # 備份版本
 ├── README.md          # 本說明文件
 └── .gitignore
 ```
@@ -125,7 +124,6 @@ Where:
 
 ```
 ├── index.htm          # Main program (latest version)
-├── doppler7.htm       # Backup version
 ├── README.md          # This file
 └── .gitignore
 ```
