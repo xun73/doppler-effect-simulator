@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>都卜勒效應模擬</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f8fafc;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --border-color: #e2e8f0;
+      --border-light: #f1f5f9;
+      --chart-grid: #f1f5f9;
+      --canvas-bg: #ffffff;
+      --canvas-border: #e2e8f0;
+      --road-fill: #94a3b8;
+      --road-stroke: #f59e0b;
+      --tick-stroke-major: rgba(0,0,0,0.25);
+      --tick-stroke-minor: rgba(0,0,0,0.1);
+      --tick-fill: #475569;
+      --pole-fill: #64748b;
+      --pole-inner: #94a3b8;
+      --wave-stroke: rgba(100, 116, 139, 0.8);
+      --dash-stroke: rgba(244, 63, 94, 0.5);
+    }
+    .dark {
+      --bg-body: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border-color: #334155;
+      --border-light: #1e293b;
+      --chart-grid: #334155;
+      --canvas-bg: #0f172a;
+      --canvas-border: #334155;
+      --road-fill: #475569;
+      --road-stroke: #f59e0b;
+      --tick-stroke-major: rgba(255,255,255,0.62);
+      --tick-stroke-minor: rgba(255,255,255,0.25);
+      --tick-fill: #cbd5e1;
+      --pole-fill: #0f172a;
+      --pole-inner: #1e293b;
+      --wave-stroke: rgba(148, 163, 184, 0.8);
+      --dash-stroke: rgba(244, 63, 94, 0.32);
+    }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-x: hidden; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    canvas { touch-action: none; }
+    .dark .bg-slate-50 { background: #0f172a !important; }
+    .dark .bg-white { background: #1e293b !important; }
+    .dark .bg-slate-100 { background: #1e293b !important; }
+    .dark .text-slate-800 { color: #f1f5f9 !important; }
+    .dark .text-slate-900 { color: #f1f5f9 !important; }
+    .dark .text-slate-700 { color: #cbd5e1 !important; }
+    .dark .text-slate-500 { color: #94a3b8 !important; }
+    .dark .text-slate-400 { color: #64748b !important; }
+    .dark .text-slate-600 { color: #94a3b8 !important; }
+    .dark .border-slate-100 { border-color: #334155 !important; }
+    .dark .border-slate-200 { border-color: #475569 !important; }
+    .dark .border-slate-200\/70 { border-color: rgba(71,85,105,0.7) !important; }
+    .dark .bg-slate-200 { background: #334155 !important; }
+    .dark .bg-slate-900 { background: #0f172a !important; }
+    .dark .bg-white\/90 { background: rgba(30,41,59,0.9) !important; }
+    .dark .bg-indigo-50 { background: rgba(99,102,241,0.15) !important; }
+    .dark .bg-rose-50 { background: rgba(244,63,94,0.15) !important; }
+    .dark .hover\:bg-indigo-100:hover { background: rgba(99,102,241,0.25) !important; }
+    .dark .hover\:bg-slate-50:hover { background: #334155 !important; }
+    .dark .hover\:bg-slate-300:hover { background: #475569 !important; }
+    .dark .hover\:bg-rose-100:hover { background: rgba(244,63,94,0.25) !important; }
+    .dark .text-indigo-600 { color: #818cf8 !important; }
+    .dark .text-indigo-700 { color: #a5b4fc !important; }
+    .dark .text-rose-600 { color: #fb7185 !important; }
+    .dark .text-rose-700 { color: #fda4af !important; }
+    .dark .border-rose-200 { border-color: rgba(244,63,94,0.3) !important; }
+    .dark .border-indigo-200 { border-color: rgba(129,140,248,0.3) !important; }
+    .dark .accent-indigo-600 { accent-color: #818cf8 !important; }
+
+    /* Responsive canvas container */
+    .canvas-container { position: relative; width: 100%; }
+    #simCanvas { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 340; max-height: 340px; }
+    @media (max-width: 640px) { #simCanvas { max-height: 200px; } }
+    @media (min-width: 641px) and (max-width: 1024px) { #simCanvas { max-height: 260px; } }
+
+    /* Responsive chart container */
+    .chart-wrap { position: relative; width: 100%; height: clamp(200px, 35vh, 360px); }
+
+    /* Responsive font sizing */
+    .responsive-title { font-size: clamp(1.1rem, 3vw, 1.875rem); }
+    .responsive-subtitle { font-size: clamp(0.78rem, 1.5vw, 1rem); }
+    .responsive-section-title { font-size: clamp(1rem, 2vw, 1.25rem); }
+
+    /* Better slider touch targets on mobile */
+    @media (max-width: 640px) {
+      input[type=range] { height: 32px; }
+      input[type=range]::-webkit-slider-thumb { width: 24px; height: 24px; }
+      .btn-touch { min-height: 48px; font-size: 0.9rem; }
+      .stat-card { padding: 0.5rem !important; }
+    }
+
+    /* Tablet adjustments */
+    @media (min-width: 641px) and (max-width: 1024px) {
+      #simCanvas { max-height: 260px; }
+    }
+  </style>
+</head>
+<body class="min-h-screen" style="background:var(--bg-body);color:var(--text-primary)">
+  <!-- Theme/Lang buttons: responsive positioning -->
+  <div class="fixed right-3 top-3 z-50 flex gap-1.5 sm:right-4 sm:top-4 sm:gap-2">
+    <button id="themeBtn" class="rounded-lg border p-2 text-xs shadow-sm transition hover:opacity-80 sm:p-2.5 sm:text-sm" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-primary)">
+      <i id="themeIcon" class="fa-solid fa-moon"></i>
+    </button>
+    <button id="langBtn" class="rounded-lg border px-2 py-2 text-xs font-bold shadow-sm transition hover:opacity-80 sm:px-3 sm:py-2.5 sm:text-sm" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-primary)">
+      <span id="langText">EN</span>
+    </button>
+  </div>
+
+  <main class="mx-auto w-full max-w-7xl px-2 py-4 sm:px-4 sm:py-6">
+    <!-- Header -->
+    <header class="mb-4 text-center sm:mb-6">
+      <h1 class="responsive-title flex items-center justify-center gap-2 font-extrabold tracking-tight sm:gap-3" style="color:var(--text-primary)">
+        <i class="fa-solid fa-wave-square text-indigo-600"></i>
+        <span data-i18n="title">都卜勒效應：移動聲源與觀測者</span>
+      </h1>
+      <p class="responsive-subtitle mt-1 sm:mt-2" style="color:var(--text-secondary)" data-i18n="subtitle">調整參數會立即反映在動畫、圖表與聲音上；也可以拖曳藍色觀測者改變離馬路的距離。</p>
+    </header>
+
+    <!-- Responsive grid: 1-col mobile, 1-col tablet with compact controls, 3-col desktop -->
+    <div id="mainGrid" class="grid grid-cols-1 gap-4 md:grid-cols-12 md:gap-5 lg:gap-6">
+      <!-- Parameters: full width on mobile/tablet, sidebar on desktop -->
+      <section id="paramSection" class="rounded-lg border p-4 shadow-sm sm:p-5 md:col-span-4 lg:col-span-3" style="background:var(--bg-card);border-color:var(--border-color)">
+        <h2 class="responsive-section-title mb-3 flex items-center gap-2 border-b pb-2 font-bold sm:mb-4" style="border-color:var(--border-light);color:var(--text-primary)">
+          <i class="fa-solid fa-sliders text-indigo-600"></i> <span data-i18n="params">參數控制</span>
+        </h2>
+
+        <!-- On tablet+ show param grid, on mobile single column -->
+        <div class="space-y-4 md:space-y-5">
+          <!-- Source Frequency -->
+          <div>
+            <div class="mb-1 flex items-center justify-between">
+              <label for="paramFreq" class="flex items-center gap-1.5 text-sm font-semibold sm:gap-2 sm:text-base" style="color:var(--text-primary)">
+                <i class="fa-solid fa-music" style="color:var(--text-muted)"></i> <span data-i18n="freqLabel">聲源頻率 f0</span>
+              </label>
+              <span id="freqVal" class="rounded px-2 py-0.5 text-sm font-bold text-indigo-600 sm:px-3 sm:text-base" style="background:var(--bg-body)">500 Hz</span>
+            </div>
+            <input id="paramFreq" type="range" min="200" max="1000" step="10" value="500" class="w-full accent-indigo-600">
+            <div class="mt-2 flex gap-2">
+              <button id="pureBtn" class="btn-touch flex-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 sm:px-3 sm:py-2 sm:text-sm"><i class="fa-solid fa-waveform"></i> <span data-i18n="pure">純音</span></button>
+              <button id="ambBtn" class="btn-touch flex-1 rounded-lg border px-2 py-2 text-xs font-bold shadow-sm transition hover:bg-slate-50 sm:px-3 sm:py-2 sm:text-sm" style="border-color:var(--border-color);background:var(--bg-card);color:var(--text-secondary)"><i class="fa-solid fa-truck-medical"></i> <span data-i18n="ambulance">救護車</span></button>
+            </div>
+          </div>
+
+          <!-- Max Speed -->
+          <div>
+            <div class="mb-1 flex items-center justify-between">
+              <label for="paramSpeed" class="flex items-center gap-1.5 text-sm font-semibold sm:gap-2 sm:text-base" style="color:var(--text-primary)">
+                <i class="fa-solid fa-gauge-high" style="color:var(--text-muted)"></i> <span data-i18n="speedLabel">汽車最高速度 vs</span>
+              </label>
+              <span id="speedVal" class="rounded px-2 py-0.5 text-sm font-bold sm:px-3 sm:text-base" style="background:var(--bg-body);color:var(--text-primary)">100 m/s</span>
+            </div>
+            <input id="paramSpeed" type="range" min="10" max="500" step="5" value="100" class="w-full accent-indigo-600">
+          </div>
+
+          <!-- Accel/Decel Time -->
+          <div>
+            <div class="mb-1 flex items-center justify-between">
+              <label for="paramTransTime" class="flex items-center gap-1.5 text-sm font-semibold sm:gap-2 sm:text-base" style="color:var(--text-primary)">
+                <i class="fa-solid fa-stopwatch" style="color:var(--text-muted)"></i> <span data-i18n="transLabel">加減速時間</span>
+              </label>
+              <span id="transTimeVal" class="rounded px-2 py-0.5 text-sm font-bold sm:px-3 sm:text-base" style="background:var(--bg-body);color:var(--text-primary)">0.2 s</span>
+            </div>
+            <input id="paramTransTime" type="range" min="0.1" max="2.0" step="0.1" value="0.2" class="w-full accent-indigo-600">
+          </div>
+
+          <!-- Road Length -->
+          <div>
+            <div class="mb-1 flex items-center justify-between">
+              <label for="paramRoadLength" class="flex items-center gap-1.5 text-sm font-semibold sm:gap-2 sm:text-base" style="color:var(--text-primary)">
+                <i class="fa-solid fa-road" style="color:var(--text-muted)"></i> <span data-i18n="roadLabel">馬路長度 L</span>
+              </label>
+              <span id="roadLengthVal" class="rounded px-2 py-0.5 text-sm font-bold sm:px-3 sm:text-base" style="background:var(--bg-body);color:var(--text-primary)">500 m</span>
+            </div>
+            <input id="paramRoadLength" type="range" min="100" max="2000" step="50" value="500" class="w-full accent-indigo-600">
+          </div>
+
+          <!-- Observer Distance -->
+          <div>
+            <div class="mb-1 flex items-center justify-between">
+              <label for="paramDist" class="flex items-center gap-1.5 text-sm font-semibold sm:gap-2 sm:text-base" style="color:var(--text-primary)">
+                <i class="fa-solid fa-arrows-up-down" style="color:var(--text-muted)"></i> <span data-i18n="distLabel">觀測者離馬路距離 d</span>
+              </label>
+              <span id="distVal" class="rounded px-2 py-0.5 text-sm font-bold sm:px-3 sm:text-base" style="background:var(--bg-body);color:var(--text-primary)">50 m</span>
+            </div>
+            <input id="paramDist" type="range" min="0" max="70" step="5" value="50" class="w-full accent-indigo-600">
+          </div>
+        </div>
+
+        <!-- Action buttons: responsive grid -->
+        <div class="mt-5 grid grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-4 sm:gap-2">
+          <button id="startBtn" class="btn-touch flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:px-4 sm:py-3 sm:text-base">
+            <i class="fa-solid fa-play"></i> <span data-i18n="simulate">模擬</span>
+          </button>
+          <button id="pauseBtn" class="btn-touch flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-base" disabled>
+            <i id="pauseIcon" class="fa-solid fa-pause"></i> <span id="pauseText" data-i18n="pause">暫停</span>
+          </button>
+          <button id="stopBtn" class="btn-touch flex items-center justify-center gap-1.5 rounded-lg px-3 py-3 text-sm font-bold shadow-sm transition hover:bg-slate-300 sm:px-4 sm:py-3 sm:text-base" style="background:var(--bg-card-hover);color:var(--text-primary);border:1px solid var(--border-color)">
+            <i class="fa-solid fa-rotate-left"></i> <span data-i18n="reset">重設</span>
+          </button>
+          <button id="muteBtn" class="btn-touch flex items-center justify-center gap-1.5 rounded-lg border px-3 py-3 text-sm font-bold shadow-sm transition hover:bg-rose-100 sm:px-4 sm:py-3 sm:text-base" style="border-color:var(--border-color);background:var(--bg-card);color:var(--text-primary)">
+            <i id="muteIcon" class="fa-solid fa-volume-high"></i> <span id="muteText" data-i18n="sound">聲音</span>
+          </button>
+        </div>
+
+        <!-- Live Data: responsive stats cards -->
+        <div id="dataSection" class="mt-4 rounded-lg border p-3 sm:mt-5 sm:p-4" style="border-color:var(--border-color);background:var(--bg-card-hover)">
+          <h3 class="mb-2 flex items-center gap-2 text-sm font-bold sm:text-base" style="color:var(--text-primary)"><i class="fa-solid fa-chart-simple text-amber-500"></i> <span data-i18n="liveData">即時數據</span></h3>
+          <div class="grid grid-cols-3 gap-1.5 text-center sm:gap-2">
+            <div class="stat-card rounded-lg border p-2 shadow-sm sm:p-3" style="border-color:var(--border-color);background:var(--bg-card)">
+              <div data-i18n="time" class="text-[10px] font-bold uppercase sm:text-xs" style="color:var(--text-muted)">時間</div>
+              <div id="dataTime" class="font-mono text-base font-extrabold text-indigo-600 sm:text-xl">0.00 s</div>
+            </div>
+            <div class="stat-card rounded-lg border p-2 shadow-sm sm:p-3" style="border-color:var(--border-color);background:var(--bg-card)">
+              <div data-i18n="carSpeed" class="text-[10px] font-bold uppercase sm:text-xs" style="color:var(--text-muted)">車速</div>
+              <div id="dataCarSpeed" class="flex h-7 flex-col justify-center font-mono text-xs font-extrabold text-indigo-600 sm:h-8 sm:text-sm">0.0 m/s</div>
+            </div>
+            <div class="stat-card rounded-lg border p-2 shadow-sm sm:p-3" style="border-color:var(--border-color);background:var(--bg-card)">
+              <div data-i18n="obsFreq" class="text-[10px] font-bold uppercase sm:text-xs" style="color:var(--text-muted)">觀測頻率</div>
+              <div id="dataObsFreq" class="font-mono text-base font-extrabold text-rose-600 sm:text-xl">等待聲波...</div>
+            </div>
+          </div>
+          <div id="phaseIndicator" class="mt-2 text-center text-xs sm:mt-3 sm:text-sm" style="color:var(--text-muted)">按「模擬」開始，或拖曳藍色觀測者。</div>
+        </div>
+      </section>
+
+      <!-- Canvas + Chart: responsive content area -->
+      <section class="flex flex-col gap-4 md:col-span-8 lg:col-span-9">
+        <!-- Canvas -->
+        <div class="canvas-container overflow-hidden rounded-lg border shadow-sm" style="background:var(--canvas-bg);border-color:var(--canvas-border)">
+          <canvas id="simCanvas" width="1600" height="340" class="rounded-lg"></canvas>
+          <!-- Canvas overlays: responsive sizing -->
+          <div class="absolute left-2 top-2 flex items-center gap-1.5 rounded-lg border px-2 py-1 font-mono text-[10px] shadow-sm backdrop-blur sm:left-4 sm:top-4 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-secondary)">
+            <span class="h-2 w-2 rounded-full bg-emerald-500 sm:h-2.5 sm:w-2.5"></span>
+            <span data-i18n="roadLen">路長</span> <span id="runningRoadLength">500</span> m
+          </div>
+          <div class="absolute right-2 top-2 flex items-center gap-1.5 rounded-lg border px-2 py-1 font-mono text-[10px] shadow-sm backdrop-blur sm:right-4 sm:top-4 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-secondary)">
+            <span id="propagationIndicator" class="h-2 w-2 rounded-full bg-red-500 sm:h-2.5 sm:w-2.5"></span>
+            <span id="propagationText" class="truncate max-w-[80px] sm:max-w-none" data-i18n="initialWave">初始位置聲波</span>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div id="chartSection" class="rounded-lg border p-3 shadow-sm sm:p-4" style="background:var(--bg-card);border-color:var(--border-color)">
+          <h3 class="mb-2 flex items-center gap-2 text-sm font-bold sm:text-base" style="color:var(--text-primary)">
+            <i class="fa-solid fa-chart-line text-rose-500"></i> <span data-i18n="chartTitle">觀測頻率 - 時間</span>
+          </h3>
+          <div class="chart-wrap"><canvas id="frequencyChart"></canvas></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const VSOUND = 343;
+    const ROAD_Y = 120;
+    const MARGIN = 40;
+    const RECORD_INTERVAL = 0.003;
+    const MAX_CHART_POINTS = 4000;
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const $ = (id) => document.getElementById(id);
+    const controls = {
+      freq: $('paramFreq'),
+      speed: $('paramSpeed'),
+      transTime: $('paramTransTime'),
+      roadLength: $('paramRoadLength'),
+      dist: $('paramDist')
+    };
+
+    let isDark = false;
+    let lang = 'zh';
+    let canvasW = 1600, canvasH = 340;
+    const i18n = {
+      title: { zh: '都卜勒效應：移動聲源與觀測者', en: 'Doppler Effect: Moving Source & Observer' },
+      subtitle: { zh: '調整參數會立即反映在動畫、圖表與聲音上；也可以拖曳藍色觀測者改變離馬路的距離。', en: 'Adjust parameters to see real-time changes in animation, chart, and sound. Drag the blue observer to change distance from the road.' },
+      params: { zh: '參數控制', en: 'Parameters' },
+      freqLabel: { zh: '聲源頻率 f0', en: 'Source Frequency f0' },
+      pure: { zh: '純音', en: 'Pure Tone' },
+      ambulance: { zh: '救護車', en: 'Ambulance' },
+      speedLabel: { zh: '汽車最高速度 vs', en: 'Max Car Speed vs' },
+      transLabel: { zh: '加減速時間', en: 'Accel/Decel Time' },
+      roadLabel: { zh: '馬路長度 L', en: 'Road Length L' },
+      distLabel: { zh: '觀測者離馬路距離 d', en: 'Observer Distance d' },
+      simulate: { zh: '模擬', en: 'Simulate' },
+      pause: { zh: '暫停', en: 'Pause' },
+      resume: { zh: '繼續', en: 'Resume' },
+      reset: { zh: '重設', en: 'Reset' },
+      sound: { zh: '聲音', en: 'Sound' },
+      muted: { zh: '靜音', en: 'Muted' },
+      liveData: { zh: '即時數據', en: 'Live Data' },
+      time: { zh: '時間', en: 'Time' },
+      carSpeed: { zh: '車速', en: 'Speed' },
+      obsFreq: { zh: '觀測頻率', en: 'Observed Freq' },
+      obsFreqChart: { zh: "觀測頻率 f' (Hz)", en: "Observed Freq f' (Hz)" },
+      waiting: { zh: '等待聲波...', en: 'Waiting for wave...' },
+      supersonic: { zh: '超音速', en: 'Supersonic' },
+      waveProp: { zh: '初始聲波傳播中', en: 'Initial wave propagating' },
+      waveNew: { zh: '新頻率聲波傳播中', en: 'New frequency wave propagating' },
+      waveArrived: { zh: '聲波已抵達觀測者', en: 'Wave has reached observer' },
+      waveNotArrived: { zh: '聲波尚未抵達觀測者', en: 'Wave has not reached observer' },
+      waveSupersonic: { zh: '超音速——聲波無法抵達觀測者前', en: 'Supersonic - wave cannot reach observer' },
+      phaseAccel: { zh: '加速中', en: 'Accelerating' },
+      phaseConstant: { zh: '等速行駛中', en: 'Cruising' },
+      phaseDecel: { zh: '減速中', en: 'Decelerating' },
+      phaseDone: { zh: '模擬完成', en: 'Simulation complete' },
+      phaseIdle: { zh: '按「模擬」開始，或拖曳藍色觀測者。', en: 'Press "Simulate" to start, or drag the blue observer.' },
+      chartTitle: { zh: '觀測頻率 - 時間', en: 'Observed Frequency vs Time' },
+      chartX: { zh: '時間 (s)', en: 'Time (s)' },
+      chartY: { zh: '觀測頻率 (Hz)', en: 'Observed Freq (Hz)' },
+      roadLen: { zh: '路長', en: 'Road' },
+      initialWave: { zh: '初始位置聲波', en: 'Initial position wave' },
+      observer: { zh: '觀測者', en: 'Observer' },
+      machCone: { zh: '馬赫錐', en: 'Mach cone' },
+      ambulanceLabel: { zh: '救護車', en: 'Ambulance' },
+      approaching: { zh: '朝向', en: 'toward' },
+      departing: { zh: '遠離', en: 'away' },
+      targetSpeed: { zh: '目標速度', en: 'Target speed' },
+      accelTo: { zh: '加速至', en: 'Accelerating to' },
+      decelTo: { zh: '減速至', en: 'Decelerating to' },
+    };
+
+    function applyTheme() {
+      const root = document.documentElement;
+      if (isDark) {
+        root.classList.add('dark');
+        document.getElementById('themeIcon').className = 'fa-solid fa-sun';
+      } else {
+        root.classList.remove('dark');
+        document.getElementById('themeIcon').className = 'fa-solid fa-moon';
+      }
+      document.body.style.background = 'var(--bg-body)';
+      document.body.style.color = 'var(--text-primary)';
+      if (frequencyChart) {
+        const gridColor = getComputedStyle(root).getPropertyValue('--chart-grid').trim() || (isDark ? '#334155' : '#f1f5f9');
+        frequencyChart.options.scales.x.grid.color = gridColor;
+        frequencyChart.options.scales.y.grid.color = gridColor;
+        try { frequencyChart.update(); } catch(e) {}
+      }
+    }
+
+    function translateUI() {
+      document.querySelector('title').textContent = i18n.title[lang];
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        if (i18n[key] && i18n[key][lang]) {
+          if (el.tagName === 'INPUT') { el.placeholder = i18n[key][lang]; }
+          else { el.textContent = i18n[key][lang]; }
+        }
+      });
+      document.getElementById('langText').textContent = lang === 'zh' ? 'EN' : '中文';
+      updatePhaseMessage();
+      updatePropagationMessage();
+      if (frequencyChart) {
+        frequencyChart.options.scales.x.title.text = i18n.chartX[lang];
+        frequencyChart.options.scales.y.title.text = i18n.chartY[lang];
+        frequencyChart.data.datasets[0].label = i18n.obsFreqChart[lang];
+        try { frequencyChart.update(); } catch(e) {}
+      }
+    }
+
+    function updatePhaseMessage() {
+      const el = document.getElementById('phaseIndicator');
+      if (phase === 'idle' && !isRunning) {
+        el.textContent = i18n.phaseIdle[lang];
+      }
+    }
+
+    function updatePropagationMessage() {}
+
+    // ── Canvas resize handler ────────────────────
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      // Keep 1600:340 aspect ratio, but scale to container width
+      const displayW = rect.width;
+      const displayH = Math.min(displayW * (340 / 1600), 340);
+      canvas.style.width = displayW + 'px';
+      canvas.style.height = displayH + 'px';
+      canvasW = Math.round(displayW * dpr);
+      canvasH = Math.round(displayH * dpr);
+      if (canvas.width !== canvasW || canvas.height !== canvasH) {
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Update road Y relative to new height
+      // ROAD_Y stays at proportional position
+      globalDpr = dpr;
+      globalDisplayW = displayW;
+      globalDisplayH = displayH;
+      pixelScale = (displayW - MARGIN * 2) / roadLength;
+      // Re-fix carX
+      if (!isRunning && phase === 'idle') {
+        carX = MARGIN;
+      } else {
+        const progress = Math.max(0, Math.min(1, (carX - MARGIN) / (canvas.width / dpr - MARGIN * 2)));
+        carX = MARGIN + progress * (displayW - MARGIN * 2);
+      }
+      draw();
+    }
+
+    let globalDpr = 1;
+    let globalDisplayW = 1600;
+    let globalDisplayH = 340;
+
+    const resizeObserver = new ResizeObserver(() => { resizeCanvas(); });
+    resizeObserver.observe(canvas);
+
+    // ── End canvas resize ────────────────────────
+
+    let f0 = 500;
+    let soundType = 'pure';
+    const AMB_LOW = 400;
+    const AMB_HIGH = 900;
+    const AMB_CYCLE = 0.8;
+    let maxVs = 100;
+    let transTime = 0.2;
+    let roadLength = 500;
+    let distanceY = 50;
+    let pixelScale = (1600 - MARGIN * 2) / roadLength;
+
+    function updateDistMax() {
+      const pixelsBelowRoad = canvasH / (globalDpr || 1) - ROAD_Y;
+      const maxDist = Math.floor(pixelsBelowRoad * roadLength / (globalDisplayW - MARGIN * 2) / 5) * 5;
+      controls.dist.max = maxDist;
+      if (distanceY > maxDist) {
+        distanceY = maxDist;
+        controls.dist.value = maxDist;
+      }
+    }
+
+    let carX = MARGIN;
+    let carVs = 0;
+    let simTime = 0;
+    let visualTime = 0;
+    let simulationStartVisualTime = 0;
+    let isRunning = false;
+    let phase = 'idle';
+    let lastTimestamp = performance.now();
+    let logTimer = 0;
+    let waveEmitTimer = 0;
+    let carHistory = [];
+    let wavefronts = [];
+    let audioCtx = null;
+    let oscillator = null;
+    let gainNode = null;
+    let isMuted = false;
+    let lastAudioFreq = null;
+    let isDraggingObserver = false;
+    let lastIdleRecordedFreq = null;
+    let stopCooldown = 0;
+    let isPaused = false;
+    let pausedAudioFreq = null;
+    let lastChartUpdate = 0;
+
+    const chartCtx = $('frequencyChart').getContext('2d');
+    const frequencyChart = new Chart(chartCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: "觀測頻率 f' (Hz)",
+          data: [],
+          borderColor: 'rgb(244, 63, 94)',
+          backgroundColor: 'rgba(244, 63, 94, 0.06)',
+          borderWidth: 2.5,
+          pointRadius: (context) => {
+            const points = context.chart.data.datasets[0].data.length;
+            return context.dataIndex === points - 1 ? 5 : 0;
+          },
+          pointHoverRadius: 5,
+          pointBackgroundColor: 'rgb(244, 63, 94)',
+          tension: 0.15,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { type: 'linear', min: 0, max: 5, title: { display: true, text: '時間 (s)', font: { size: 12 } }, grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || '#f1f5f9' }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+          y: { min: 0, title: { display: true, text: '觀測頻率 (Hz)', font: { size: 12 } }, grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || '#f1f5f9' }, ticks: { maxTicksLimit: 6, font: { size: 10 } } }
+        }
+      }
+    });
+
+    function formatSpeed(v) {
+      return `${v} m/s (${(v * 3.6).toFixed(0)} km/hr)`;
+    }
+
+    function getSourceFreq(t) {
+      if (soundType === 'ambulance') {
+        const cyclePos = (t / AMB_CYCLE) % 1;
+        return cyclePos < 0.5 ? AMB_LOW : AMB_HIGH;
+      }
+      return f0;
+    }
+
+    function syncUi() {
+      if (soundType === 'ambulance') {
+        $('freqVal').innerText = `${i18n.ambulanceLabel[lang]} (${AMB_LOW}/${AMB_HIGH} Hz)`;
+      } else {
+        $('freqVal').innerText = `${f0} Hz`;
+      }
+      $('speedVal').innerText = formatSpeed(maxVs);
+      $('transTimeVal').innerText = `${transTime.toFixed(1)} s`;
+      $('roadLengthVal').innerText = `${roadLength} m`;
+      $('runningRoadLength').innerText = roadLength;
+      $('distVal').innerText = `${distanceY.toFixed(0)} m`;
+    }
+
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      createAudioNodes();
+    }
+
+    function createAudioNodes() {
+      if (oscillator) {
+        try { oscillator.stop(); } catch(e) {}
+        try { oscillator.disconnect(); } catch(e) {}
+      }
+      if (gainNode) {
+        try { gainNode.disconnect(); } catch(e) {}
+      }
+      oscillator = audioCtx.createOscillator();
+      gainNode = audioCtx.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(getSourceFreq(0), audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+    }
+
+    function ensureAudioActive() {
+      initAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!oscillator || oscillator.state === 'finished') {
+        createAudioNodes();
+      }
+    }
+
+    function setAudioFrequency(freq) {
+      if (!audioCtx) return;
+      if (!gainNode) { ensureAudioActive(); if (!gainNode) return; }
+      if (!oscillator || oscillator.state === 'finished') { ensureAudioActive(); if (!oscillator) return; }
+      try {
+        if (freq !== lastAudioFreq) {
+          oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.0035);
+          lastAudioFreq = freq;
+        }
+        gainNode.gain.setTargetAtTime(isMuted ? 0 : 0.22, audioCtx.currentTime, 0.04);
+      } catch(e) {}
+    }
+
+    function startInitialSound() {
+      ensureAudioActive();
+    }
+
+    function createWavefront({ birthTime, x = carX, v = carVs, sourceTime = isRunning ? simTime : null, sourceFreq = getSourceFreq(isRunning ? simTime : visualTime) }) {
+      return {
+        x,
+        y: ROAD_Y,
+        birthTime,
+        sourceTime,
+        sourceFreq,
+        sourceX: x,
+        sourceV: v,
+        radius: 0,
+        alpha: 0.8
+      };
+    }
+
+    function preparePreservedWavesForStart() {
+      simulationStartVisualTime = visualTime;
+      wavefronts.forEach((wave) => {
+        const ageAtStart = Math.max(0, simulationStartVisualTime - wave.birthTime);
+        wave.sourceTime = -ageAtStart;
+        wave.sourceX = wave.x;
+        wave.sourceV = 0;
+      });
+    }
+
+    function clearRecordedData() {
+      logTimer = 0;
+      frequencyChart.data.labels = [];
+      frequencyChart.data.datasets[0].data = [];
+      frequencyChart.options.scales.x.min = 0;
+      frequencyChart.options.scales.x.max = 5;
+      frequencyChart.update();
+    }
+
+    function resetSimulationData(options = {}) {
+      const preserveWaves = Boolean(options.preserveWaves);
+      carX = MARGIN;
+      carVs = 0;
+      simTime = 0;
+      if (!preserveWaves) visualTime = 0;
+      phase = 'idle';
+      if (!preserveWaves) {
+        waveEmitTimer = 0;
+        wavefronts = [createWavefront({ birthTime: -0.2, x: carX, v: 0, sourceTime: null, sourceFreq: getSourceFreq(0) })];
+      }
+      carHistory = [];
+      if (!preserveWaves) {
+        lastIdleRecordedFreq = null;
+        clearRecordedData();
+      }
+      $('dataTime').innerText = '0.00 s';
+      $('dataCarSpeed').innerHTML = '0.0 m/s';
+      $('dataObsFreq').innerText = `${f0.toFixed(1)} Hz`;
+      $('dataObsFreq').className = 'font-mono text-base font-extrabold text-rose-600 sm:text-xl';
+      $('phaseIndicator').innerText = i18n.phaseIdle[lang];
+      $('propagationIndicator').className = 'h-2 w-2 rounded-full bg-emerald-500 sm:h-2.5 sm:w-2.5';
+      $('propagationText').innerText = i18n.initialWave[lang];
+    }
+
+    function resetSimulation() {
+      isRunning = false;
+      isPaused = false;
+      pausedAudioFreq = null;
+      $('pauseBtn').disabled = true;
+      $('pauseIcon').className = 'fa-solid fa-pause';
+      $('pauseText').innerText = i18n.pause[lang];
+      resetSimulationData();
+      if (gainNode) try { gainNode.gain.setValueAtTime(0, audioCtx.currentTime); } catch(e) {}
+      draw();
+      draw();
+    }
+
+    function togglePause() {
+      if (!isRunning) return;
+      isPaused = !isPaused;
+      if (isPaused) {
+        pausedAudioFreq = audioFreq;
+        $('pauseIcon').className = 'fa-solid fa-play';
+        $('pauseText').innerText = i18n.resume[lang];
+      } else {
+        pausedAudioFreq = null;
+        $('pauseIcon').className = 'fa-solid fa-pause';
+        $('pauseText').innerText = i18n.pause[lang];
+        lastTimestamp = performance.now();
+      }
+    }
+
+    function startSimulation() {
+      isPaused = false;
+      pausedAudioFreq = null;
+      $('pauseIcon').className = 'fa-solid fa-pause';
+      $('pauseText').innerText = i18n.pause[lang];
+      $('pauseBtn').disabled = false;
+      resetSimulationData({ preserveWaves: true });
+      clearRecordedData();
+      lastIdleRecordedFreq = null;
+      ensureAudioActive();
+      wavefronts.push(createWavefront({ birthTime: visualTime - 0.2, x: carX, v: 0, sourceTime: 0, sourceFreq: getSourceFreq(visualTime) }));
+      preparePreservedWavesForStart();
+      isRunning = true;
+      phase = 'accelerating';
+      carHistory = [{ time: 0, x: carX, v: 0 }];
+      lastTimestamp = performance.now();
+      if (gainNode && audioCtx) {
+        try {
+          gainNode.gain.setValueAtTime(isMuted ? 0 : 0.22, audioCtx.currentTime);
+          oscillator.frequency.setValueAtTime(getSourceFreq(0), audioCtx.currentTime);
+          lastAudioFreq = getSourceFreq(0);
+        } catch(e) {}
+      }
+      $('phaseIndicator').innerHTML = `<span class="font-semibold text-amber-500"><i class="fa-solid fa-gauge"></i> ${i18n.accelTo[lang]} ${maxVs} m/s</span>`;
+    }
+
+    function recomputeScale(keepCarProgress = true) {
+      const progress = keepCarProgress ? Math.max(0, Math.min(1, (carX - MARGIN) / (globalDisplayW - MARGIN * 2))) : 0;
+      pixelScale = (globalDisplayW - MARGIN * 2) / roadLength;
+      carX = MARGIN + progress * (globalDisplayW - MARGIN * 2);
+      wavefronts = [createWavefront({ birthTime: visualTime - 0.2, x: carX, v: carVs, sourceTime: isRunning ? simTime - 0.2 : null, sourceFreq: getSourceFreq(isRunning ? simTime : 0) })];
+      carHistory = [];
+    }
+
+    function applyLiveParameterChanges() {
+      const prevF0 = f0;
+      f0 = Number(controls.freq.value);
+      const f0Changed = prevF0 !== f0;
+      maxVs = Number(controls.speed.value);
+      transTime = Number(controls.transTime.value);
+      const nextRoadLength = Number(controls.roadLength.value);
+      const roadChanged = nextRoadLength !== roadLength;
+      roadLength = nextRoadLength;
+      distanceY = Number(controls.dist.value);
+      if (roadChanged) {
+        recomputeScale(true);
+        updateDistMax();
+      }
+      syncUi();
+      if (!isRunning) {
+        clearRecordedData();
+        lastIdleRecordedFreq = null;
+        if (f0Changed) {
+          wavefronts.push(createWavefront({ birthTime: visualTime, x: carX, v: 0, sourceTime: null, sourceFreq: getSourceFreq(visualTime) }));
+        }
+      }
+      draw();
+    }
+
+    Object.values(controls).forEach((input) => input.addEventListener('input', (event) => {
+      startInitialSound();
+      applyLiveParameterChanges(event);
+    }));
+    document.addEventListener('pointerdown', startInitialSound, { once: true });
+    document.addEventListener('keydown', startInitialSound, { once: true });
+
+    $('themeBtn').addEventListener('click', () => {
+      isDark = !isDark;
+      applyTheme();
+    });
+    $('langBtn').addEventListener('click', () => {
+      lang = lang === 'zh' ? 'en' : 'zh';
+      translateUI();
+      syncUi();
+      if (!isRunning) draw();
+    });
+
+    $('startBtn').addEventListener('click', startSimulation);
+    $('pauseBtn').addEventListener('click', togglePause);
+    $('stopBtn').addEventListener('click', resetSimulation);
+    $('muteBtn').addEventListener('click', () => {
+      isMuted = !isMuted;
+      $('muteIcon').className = isMuted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high';
+      $('muteText').innerText = isMuted ? i18n.muted[lang] : i18n.sound[lang];
+      if (gainNode && audioCtx) gainNode.gain.setValueAtTime(isMuted ? 0 : 0.22, audioCtx.currentTime);
+    });
+
+    const SOUND_TYPES = ['pure', 'ambulance'];
+
+    function setSoundType(type) {
+      if (type === soundType) return;
+      soundType = type;
+      controls.freq.disabled = type === 'ambulance';
+      for (const t of SOUND_TYPES) {
+        const btn = $(`${t === 'ambulance' ? 'amb' : t}Btn`);
+        const active = t === type;
+        btn.className = active
+          ? 'btn-touch flex-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 sm:px-3 sm:py-2 sm:text-sm'
+          : 'btn-touch flex-1 rounded-lg border px-2 py-2 text-xs font-bold shadow-sm transition hover:bg-slate-50 sm:px-3 sm:py-2 sm:text-sm';
+        btn.style.borderColor = active ? '' : 'var(--border-color)';
+        btn.style.background = active ? '' : 'var(--bg-card)';
+        btn.style.color = active ? '' : 'var(--text-secondary)';
+        btn.title = i18n[t][lang];
+      }
+      syncUi();
+      if (!isRunning) {
+        clearRecordedData();
+        lastIdleRecordedFreq = null;
+        wavefronts.push(createWavefront({ birthTime: visualTime, x: carX, v: 0, sourceTime: null, sourceFreq: getSourceFreq(visualTime) }));
+      }
+      draw();
+    }
+
+    for (const t of SOUND_TYPES) {
+      $(`${t === 'ambulance' ? 'amb' : t}Btn`).addEventListener('click', () => { startInitialSound(); setSoundType(t); });
+    }
+
+    function observerPixelY() {
+      return ROAD_Y + distanceY * pixelScale;
+    }
+
+    function updateObserverFromPointer(event) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleY = (canvasH / (globalDpr || 1)) / rect.height;
+      const y = (event.clientY - rect.top) * scaleY;
+      const meters = (y - ROAD_Y) / pixelScale;
+      const clamped = Math.max(Number(controls.dist.min), Math.min(Number(controls.dist.max), meters));
+      distanceY = Math.round(clamped / 5) * 5;
+      controls.dist.value = distanceY;
+      syncUi();
+      draw();
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = (canvasW / (globalDpr || 1)) / rect.width;
+      const scaleY = (canvasH / (globalDpr || 1)) / rect.height;
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+      const dx = x - globalDisplayW / 2;
+      const dy = y - observerPixelY();
+      if (Math.hypot(dx, dy) <= 28) {
+        isDraggingObserver = true;
+        canvas.setPointerCapture(event.pointerId);
+        updateObserverFromPointer(event);
+      }
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (isDraggingObserver) updateObserverFromPointer(event);
+    });
+    canvas.addEventListener('pointerup', () => { isDraggingObserver = false; });
+    canvas.addEventListener('pointercancel', () => { isDraggingObserver = false; });
+
+    function getRetardedState(tCurrent) {
+      if (!carHistory.length) return null;
+      const obsX = globalDisplayW / 2;
+      for (let i = carHistory.length - 1; i > 0; i--) {
+        const s0 = carHistory[i - 1];
+        const s1 = carHistory[i];
+        if (s1.time > tCurrent) continue;
+        const dt0 = tCurrent - s0.time;
+        const dx0 = (s0.x - obsX) / pixelScale;
+        const dist0 = Math.hypot(dx0, distanceY);
+        const prop0 = dt0 * VSOUND - dist0;
+        const dt1 = tCurrent - s1.time;
+        const dx1 = (s1.x - obsX) / pixelScale;
+        const dist1 = Math.hypot(dx1, distanceY);
+        const prop1 = dt1 * VSOUND - dist1;
+        if (prop0 * prop1 <= 0 && Math.abs(prop0 - prop1) > 1e-10) {
+          const frac = prop0 / (prop0 - prop1);
+          return {
+            time: s0.time + frac * (s1.time - s0.time),
+            x: s0.x + frac * (s1.x - s0.x),
+            v: s0.v + frac * (s1.v - s0.v)
+          };
+        }
+      }
+      return null;
+    }
+
+    function observedFrequency(retardedState) {
+      if (!retardedState) return null;
+      const dx = (retardedState.x - globalDisplayW / 2) / pixelScale;
+      const r = Math.hypot(dx, distanceY);
+      const cosTheta = r > 0 ? dx / r : 0;
+      const radialSpeedTowardObserver = -retardedState.v * cosTheta;
+      const denominator = VSOUND - radialSpeedTowardObserver;
+      if (denominator <= 1) return -1;
+      const srcFreq = getSourceFreq(retardedState.time);
+      let f = srcFreq * VSOUND / denominator;
+      if (!Number.isFinite(f)) f = srcFreq;
+      return Math.max(20, Math.min(5000, f));
+    }
+
+    function observedFrequencyFromWave(wave) {
+      if (!wave) return null;
+      const dx = (wave.sourceX - globalDisplayW / 2) / pixelScale;
+      const r = Math.hypot(dx, distanceY);
+      const cosTheta = r > 0 ? dx / r : 0;
+      const radialSpeedTowardObserver = -wave.sourceV * cosTheta;
+      const denominator = VSOUND - radialSpeedTowardObserver;
+      if (denominator <= 1) return -1;
+      const emittedFreq = Number.isFinite(wave.sourceFreq) ? wave.sourceFreq : getSourceFreq(0);
+      let f = emittedFreq * VSOUND / denominator;
+      if (!Number.isFinite(f)) f = emittedFreq;
+      return Math.max(20, Math.min(5000, f));
+    }
+
+
+    function hasWaveReachedObserver() {
+      const obsX = globalDisplayW / 2;
+      const obsY = observerPixelY();
+      return wavefronts.some((wave) => {
+        const distancePx = Math.hypot(wave.x - obsX, wave.y - obsY);
+        return wave.radius >= distancePx;
+      });
+    }
+
+    function getLatestReceivedWave() {
+      const obsX = globalDisplayW / 2;
+      const obsY = observerPixelY();
+      let latest = null;
+      for (const wave of wavefronts) {
+        if (wave.sourceTime === null || wave.sourceTime > simTime) continue;
+        const distancePx = Math.hypot(wave.x - obsX, wave.y - obsY);
+        if (wave.radius < distancePx) continue;
+        if (!latest || wave.sourceTime > latest.sourceTime) latest = wave;
+      }
+      return latest;
+    }
+
+    function getLatestReachedWave() {
+      const obsX = globalDisplayW / 2;
+      const obsY = observerPixelY();
+      let latest = null;
+      for (const wave of wavefronts) {
+        const distancePx = Math.hypot(wave.x - obsX, wave.y - obsY);
+        if (wave.radius < distancePx) continue;
+        if (!latest || wave.birthTime > latest.birthTime) latest = wave;
+      }
+      return latest;
+    }
+
+    function recordData(time, freq) {
+      const data = frequencyChart.data.datasets[0].data;
+      if (data.length >= MAX_CHART_POINTS) {
+        const newData = [];
+        for (let i = 0; i < data.length; i += 2) {
+          newData.push(data[i]);
+        }
+        frequencyChart.data.datasets[0].data = newData;
+      }
+      const t = Number(time);
+      const f = Number(freq);
+      frequencyChart.data.datasets[0].data.push({ x: t, y: f });
+      frequencyChart.options.scales.x.max = Math.max(5, t + 1);
+      const now = performance.now();
+      if (now - lastChartUpdate >= 16) {
+        frequencyChart.update('none');
+        lastChartUpdate = now;
+      }
+    }
+
+    let audioFreq = null;
+
+    function step(timestamp) {
+      let dt = (timestamp - lastTimestamp) / 1000;
+      if (!Number.isFinite(dt) || dt < 0 || dt > 0.1) dt = 0.016;
+      lastTimestamp = timestamp;
+      if (isPaused) dt = 0;
+      visualTime += dt;
+      if (isRunning) simTime += dt;
+
+      if (isRunning) {
+        const currentMeters = (carX - MARGIN) / pixelScale;
+        const acceleration = maxVs / transTime;
+        const decelerationDistance = 0.5 * maxVs * transTime;
+
+        if (phase === 'accelerating') {
+          carVs = Math.min(maxVs, carVs + acceleration * dt);
+          if (carVs >= maxVs) {
+            phase = 'constant';
+          } else {
+            $('phaseIndicator').innerHTML = `<span class="font-semibold text-amber-500"><i class="fa-solid fa-gauge"></i> ${i18n.accelTo[lang]} ${maxVs} m/s</span>`;
+          }
+        }
+
+        if (phase === 'constant' && carVs !== maxVs) {
+          if (carVs < maxVs) {
+            carVs = Math.min(maxVs, carVs + acceleration * dt);
+            $('phaseIndicator').innerHTML = `<span class="font-semibold text-amber-500"><i class="fa-solid fa-gauge"></i> ${i18n.accelTo[lang]} ${maxVs} m/s</span>`;
+          } else {
+            carVs = Math.max(maxVs, carVs - acceleration * dt);
+            $('phaseIndicator').innerHTML = `<span class="font-semibold text-rose-500"><i class="fa-solid fa-angles-down"></i> ${i18n.decelTo[lang]} ${maxVs} m/s</span>`;
+          }
+        }
+
+        if (phase === 'constant' && carVs === maxVs) {
+          $('phaseIndicator').innerHTML = `<span class="font-semibold text-emerald-500"><i class="fa-solid fa-road"></i> ${i18n.phaseConstant[lang]}</span>`;
+        }
+
+        if (phase !== 'decelerating' && phase !== 'stopped' && roadLength - currentMeters <= decelerationDistance) {
+          phase = 'decelerating';
+          $('phaseIndicator').innerHTML = `<span class="font-semibold text-rose-500"><i class="fa-solid fa-angles-down"></i> ${i18n.phaseDecel[lang]}</span>`;
+        }
+
+        if (phase === 'decelerating') {
+          carVs = Math.max(0, carVs - acceleration * dt);
+          if (carVs <= 0.05 || currentMeters >= roadLength) {
+            carVs = 0;
+            carX = globalDisplayW - MARGIN;
+            phase = 'stopped';
+            stopCooldown = 0;
+            $('phaseIndicator').innerHTML = `<span class="font-semibold text-blue-500"><i class="fa-solid fa-flag-checkered"></i> ${i18n.phaseDone[lang]}</span>`;
+          }
+        }
+
+        if (phase !== 'stopped') {
+          carX = Math.min(globalDisplayW - MARGIN, carX + carVs * pixelScale * dt);
+        }
+      }
+
+      if (phase === 'stopped' && isRunning) {
+        stopCooldown += dt;
+        if (stopCooldown > Math.hypot(roadLength / 2, distanceY) / VSOUND + 1.5) {
+          isRunning = false;
+          isPaused = false;
+          $('pauseBtn').disabled = true;
+          $('pauseIcon').className = 'fa-solid fa-pause';
+          $('pauseText').innerText = i18n.pause[lang];
+        }
+      }
+
+      if (isRunning || carHistory.length) carHistory.push({ time: simTime, x: carX, v: carVs });
+      carHistory = carHistory.filter((state) => simTime - state.time < 8);
+
+      waveEmitTimer += dt;
+      const avgFreq = soundType === 'ambulance' ? (AMB_LOW + AMB_HIGH) / 2 : f0;
+      const emitInterval = Math.max(0.05, Math.min(0.18, 44 / avgFreq));
+      if (waveEmitTimer >= emitInterval) {
+        waveEmitTimer = 0;
+        wavefronts.push(createWavefront({ birthTime: visualTime, x: carX, v: carVs, sourceTime: isRunning ? simTime : null, sourceFreq: isRunning ? getSourceFreq(simTime) : getSourceFreq(visualTime) }));
+      }
+      wavefronts.forEach((wave) => {
+        const age = visualTime - wave.birthTime;
+        wave.radius = VSOUND * age * pixelScale;
+        wave.alpha = Math.max(0.8 - age * 0.18, 0);
+      });
+      wavefronts = wavefronts.filter((wave) => wave.alpha > 0.02);
+
+      const retardedState = getRetardedState(simTime);
+      const fObserved = observedFrequency(retardedState);
+
+      let muteGain = false;
+
+      if (!isRunning && phase === 'idle') {
+        const latestReachedWave = getLatestReachedWave();
+        const waveReached = latestReachedWave !== null;
+        const latestWave = wavefronts.length ? wavefronts.reduce((a, b) => a.birthTime > b.birthTime ? a : b) : null;
+        const latestWaveReached = latestWave && Math.hypot(latestWave.x - globalDisplayW / 2, latestWave.y - observerPixelY()) <= latestWave.radius;
+        $('propagationIndicator').className = waveReached ? 'h-2 w-2 rounded-full bg-emerald-500 sm:h-2.5 sm:w-2.5' : 'h-2 w-2 rounded-full bg-red-500 sm:h-2.5 sm:w-2.5';
+        if (!waveReached) {
+          $('propagationText').innerText = i18n.waveProp[lang];
+        } else if (!latestWaveReached) {
+          $('propagationText').innerText = i18n.waveNew[lang];
+        } else {
+          $('propagationText').innerText = i18n.waveArrived[lang];
+        }
+        if (waveReached) {
+          const waveFreq = latestReachedWave.sourceFreq;
+          $('dataObsFreq').innerText = `${Number(waveFreq).toFixed(1)} Hz`;
+          $('dataObsFreq').className = 'font-mono text-base font-extrabold text-rose-600 sm:text-xl';
+          audioFreq = waveFreq;
+          if (waveFreq !== lastIdleRecordedFreq) {
+            recordData(0, waveFreq);
+            lastIdleRecordedFreq = waveFreq;
+          }
+        } else {
+          $('dataObsFreq').innerText = i18n.waiting[lang];
+          $('dataObsFreq').className = 'font-mono text-sm font-semibold sm:text-base' + (isDark ? ' text-slate-400' : ' text-slate-400');
+          muteGain = true;
+        }
+      } else if (fObserved === -1) {
+        $('propagationIndicator').className = 'h-2 w-2 rounded-full bg-red-500 sm:h-2.5 sm:w-2.5';
+        $('propagationText').innerText = i18n.waveSupersonic[lang];
+        $('dataObsFreq').innerText = i18n.supersonic[lang];
+        $('dataObsFreq').className = 'font-mono text-base font-extrabold text-rose-600 sm:text-xl';
+        muteGain = true;
+      } else if (fObserved !== null && fObserved !== undefined) {
+        $('propagationIndicator').className = 'h-2 w-2 rounded-full bg-emerald-500 sm:h-2.5 sm:w-2.5';
+        $('propagationText').innerText = i18n.waveArrived[lang];
+        $('dataObsFreq').innerText = `${fObserved.toFixed(1)} Hz`;
+        $('dataObsFreq').className = 'font-mono text-base font-extrabold text-rose-600 sm:text-xl';
+        audioFreq = fObserved;
+        logTimer += dt;
+        while (isRunning && logTimer >= RECORD_INTERVAL) {
+          const recordTime = Math.max(0, simTime - logTimer + RECORD_INTERVAL);
+          logTimer -= RECORD_INTERVAL;
+          recordData(recordTime.toFixed(3), fObserved.toFixed(1));
+        }
+      } else {
+        if (isRunning) {
+          const reachedWave = getLatestReachedWave();
+          if (reachedWave) {
+            const playFreq = Number(reachedWave.sourceFreq);
+            $('propagationIndicator').className = 'h-2 w-2 rounded-full bg-emerald-500 sm:h-2.5 sm:w-2.5';
+            $('propagationText').innerText = i18n.waveProp[lang];
+            $('dataObsFreq').innerText = `${playFreq.toFixed(1)} Hz`;
+            $('dataObsFreq').className = 'font-mono text-base font-extrabold text-rose-600 sm:text-xl';
+            audioFreq = playFreq;
+            logTimer += dt;
+            while (logTimer >= RECORD_INTERVAL) {
+              const recordTime = Math.max(0, simTime - logTimer + RECORD_INTERVAL);
+              logTimer -= RECORD_INTERVAL;
+              recordData(recordTime.toFixed(3), playFreq.toFixed(1));
+            }
+          } else {
+            $('propagationIndicator').className = 'h-2 w-2 rounded-full bg-red-500 sm:h-2.5 sm:w-2.5';
+            $('propagationText').innerText = i18n.waveNotArrived[lang];
+            $('dataObsFreq').innerText = i18n.waiting[lang];
+            $('dataObsFreq').className = 'font-mono text-sm font-semibold sm:text-base text-slate-400';
+          }
+        } else {
+          $('propagationIndicator').className = 'h-2 w-2 rounded-full bg-red-500 sm:h-2.5 sm:w-2.5';
+          $('propagationText').innerText = i18n.waveNotArrived[lang];
+          $('dataObsFreq').innerText = `${getSourceFreq(0).toFixed(1)} Hz`;
+          $('dataObsFreq').className = 'font-mono text-base font-extrabold text-rose-600 sm:text-xl';
+          muteGain = true;
+        }
+      }
+
+      if (audioFreq !== null) {
+        setAudioFrequency(audioFreq);
+      }
+      if (muteGain && gainNode && audioCtx) {
+        try { gainNode.gain.setValueAtTime(0, audioCtx.currentTime); } catch(e) {}
+      }
+
+      $('dataTime').innerText = `${simTime.toFixed(2)} s`;
+      $('dataCarSpeed').innerHTML = `<span>${carVs.toFixed(1)} m/s</span><span class="text-[10px] font-normal" style="color:var(--text-muted)">${(carVs * 3.6).toFixed(0)} km/hr</span>`;
+      draw();
+      requestAnimationFrame(step);
+    }
+
+    function getCSSVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function draw() {
+      const W = globalDisplayW, H = globalDisplayH;
+      ctx.clearRect(0, 0, W, H);
+      const centerX = W / 2;
+      const obsY = observerPixelY();
+      const roadFill = getCSSVar('--road-fill');
+      const roadStroke = getCSSVar('--road-stroke');
+      const tickMajor = getCSSVar('--tick-stroke-major');
+      const tickMinor = getCSSVar('--tick-stroke-minor');
+      const tickFill = getCSSVar('--tick-fill');
+      const poleFill = getCSSVar('--pole-fill');
+      const poleInner = getCSSVar('--pole-inner');
+      const waveStroke = getCSSVar('--wave-stroke');
+      const dashStroke = getCSSVar('--dash-stroke');
+
+      ctx.fillStyle = roadFill;
+      ctx.fillRect(0, ROAD_Y - 20, W, 40);
+      ctx.strokeStyle = roadStroke;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.moveTo(0, ROAD_Y);
+      ctx.lineTo(W, ROAD_Y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      let majorTick = 100;
+      let minorTick = 50;
+      if (roadLength <= 200) { majorTick = 50; minorTick = 10; }
+      else if (roadLength <= 400) { majorTick = 50; minorTick = 25; }
+      else if (roadLength > 800) { majorTick = 200; minorTick = 100; }
+
+      ctx.textAlign = 'center';
+      ctx.font = '14px monospace';
+      for (let m = 0; m <= roadLength; m += minorTick) {
+        const x = MARGIN + m * pixelScale;
+        const major = m % majorTick === 0;
+        ctx.strokeStyle = major ? tickMajor : tickMinor;
+        ctx.lineWidth = major ? 1.5 : 1;
+        ctx.beginPath();
+        ctx.moveTo(x, ROAD_Y - 20);
+        ctx.lineTo(x, ROAD_Y - 14);
+        ctx.moveTo(x, ROAD_Y + 14);
+        ctx.lineTo(x, ROAD_Y + 20);
+        ctx.stroke();
+        if (major) {
+          ctx.fillStyle = tickFill;
+          ctx.fillText(`${m}m`, x, ROAD_Y - 27);
+        }
+      }
+
+      ctx.fillStyle = poleFill;
+      ctx.fillRect(centerX - 30, ROAD_Y + 20, 60, H - ROAD_Y - 20);
+      ctx.fillStyle = poleInner;
+      ctx.fillRect(centerX - 14, ROAD_Y + 20, 28, H - ROAD_Y - 20);
+
+      wavefronts.forEach((wave) => {
+        if (wave.alpha < 0.04) return;
+        if (wave.x + wave.radius < 0 || wave.x - wave.radius > W) return;
+        if (wave.y + wave.radius < 0 || wave.y - wave.radius > H) return;
+        const alpha = wave.alpha;
+        const baseColor = isDark ? '148, 163, 184' : '100, 116, 139';
+        ctx.strokeStyle = `rgba(${baseColor}, ${alpha})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      ctx.strokeStyle = dashStroke;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(carX, ROAD_Y);
+      ctx.lineTo(centerX, obsY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (carVs > VSOUND) {
+        const machAngle = Math.asin(VSOUND / carVs);
+        const coneLen = Math.min(carX - MARGIN + 200, 600);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(carX, ROAD_Y);
+        ctx.lineTo(carX - coneLen * Math.cos(machAngle), ROAD_Y - coneLen * Math.sin(machAngle));
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(carX, ROAD_Y);
+        ctx.lineTo(carX - coneLen * Math.cos(machAngle), ROAD_Y + coneLen * Math.sin(machAngle));
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText(i18n.machCone[lang], carX + 8, ROAD_Y - 8);
+      }
+
+      drawCar(carX, ROAD_Y);
+      drawObserver(centerX, obsY);
+    }
+
+    function drawObserver(x, y) {
+      ctx.fillStyle = '#3b82f6';
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isDraggingObserver ? 'rgba(191, 219, 254, 0.95)' : 'rgba(59, 130, 246, 0.45)';
+      ctx.lineWidth = isDraggingObserver ? 5 : 3;
+      ctx.beginPath();
+      ctx.arc(x, y, 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = isDark ? '#1e293b' : '#f8fafc';
+      ctx.font = 'bold 11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(i18n.observer[lang], x, y + 34);
+    }
+
+    function drawCar(x, y) {
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.roundRect(x - 18, y - 9, 36, 18, 4);
+      ctx.fill();
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.roundRect(x - 8, y - 6, 18, 12, 2);
+      ctx.fill();
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y - 5);
+      ctx.lineTo(x + 10, y - 4);
+      ctx.lineTo(x + 10, y + 4);
+      ctx.lineTo(x + 4, y + 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(x + 16, y - 7, 2, 3);
+      ctx.fillRect(x + 16, y + 4, 2, 3);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(x - 12, y - 11, 8, 2);
+      ctx.fillRect(x + 5, y - 11, 8, 2);
+      ctx.fillRect(x - 12, y + 9, 8, 2);
+      ctx.fillRect(x + 5, y + 9, 8, 2);
+    }
+
+    resizeCanvas();
+    resetSimulationData();
+    applyTheme();
+    translateUI();
+    syncUi();
+    draw();
+    requestAnimationFrame(step);
+  </script>
+</body>
+</html>
