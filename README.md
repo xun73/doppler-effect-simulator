@@ -16,6 +16,8 @@
 
 ### 簡介
 
+可直接連線觀看互動網頁：**[https://xun73.github.io/doppler-effect-simulator/](https://xun73.github.io/doppler-effect-simulator/)**
+
 這是一個互動式的**都卜勒效應（Doppler Effect）** 模擬器，讓使用者可以直觀地觀察和聆聽移動聲源產生的頻率變化。模擬器包含完整的加速→等速→減速行駛過程，並支援波前傳播動畫、即時頻率圖表與 Web Audio 聲音合成。
 
 ### 功能特色
@@ -132,7 +134,8 @@ Where:
 
 ## Live Demo
 
-Open `index.htm` in any modern browser — no build step required.
+- **GitHub Pages:** [https://xun73.github.io/doppler-effect-simulator/](https://xun73.github.io/doppler-effect-simulator/)
+- Open `index.htm` in any modern browser — no build step required.
 
 ## License
 
