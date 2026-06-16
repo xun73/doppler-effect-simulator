@@ -90,8 +90,8 @@
     /* Responsive canvas container */
     .canvas-container { position: relative; width: 100%; }
     #simCanvas { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 340; max-height: 340px; }
-    @media (max-width: 640px) { #simCanvas { max-height: 200px; } }
-    @media (min-width: 641px) and (max-width: 1024px) { #simCanvas { max-height: 260px; } }
+    @media (max-width: 640px) { #simCanvas { aspect-ratio: 5 / 3; max-height: 45vh; } }
+    @media (min-width: 641px) and (max-width: 1024px) { #simCanvas { aspect-ratio: 16 / 5; max-height: 280px; } }
 
     /* Responsive chart container */
     .chart-wrap { position: relative; width: 100%; height: clamp(200px, 35vh, 360px); }
@@ -272,9 +272,9 @@
 
   <script>
     const VSOUND = 343;
-    const ROAD_Y = 120;
-    const MARGIN = 40;
-    const RECORD_INTERVAL = 0.003;
+    let ROAD_Y = 120;
+    let MARGIN = 40;
+    let RECORD_INTERVAL = Math.min(window.innerWidth, window.screen.width) < 640 ? 0.01 : 0.003;
     const MAX_CHART_POINTS = 4000;
     const canvas = document.getElementById('simCanvas');
     const ctx = canvas.getContext('2d');
@@ -291,6 +291,8 @@
     let isDark = false;
     let lang = (navigator.language || '').startsWith('zh') ? 'zh' : 'en';
     let canvasW = 1600, canvasH = 340;
+    const isMobileDevice = Math.min(window.innerWidth, window.screen.width) < 640;
+    let frameSkip = 0;
     const i18n = {
       title: { zh: '都卜勒效應：移動聲源與觀測者', en: 'Doppler Effect: Moving Source & Observer' },
       subtitle: { zh: '調整參數會立即反映在動畫、圖表與聲音上；也可以拖曳藍色觀測者改變離馬路的距離。', en: 'Adjust parameters to see real-time changes in animation, chart, and sound. Drag the blue observer to change distance from the road.' },
@@ -391,10 +393,12 @@
     // ── Canvas resize handler ────────────────────
     function resizeCanvas() {
       const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      // Keep 1600:340 aspect ratio, but scale to container width
+      const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap DPR on mobile
       const displayW = rect.width;
-      const displayH = Math.min(displayW * (340 / 1600), 340);
+      const isMobile = displayW < 640;
+      // Use taller aspect ratio on mobile
+      const ratio = isMobile ? 5/3 : 1600/340;
+      const displayH = Math.min(displayW / ratio, isMobile ? (window.innerHeight * 0.45) : 340);
       canvas.style.width = displayW + 'px';
       canvas.style.height = displayH + 'px';
       canvasW = Math.round(displayW * dpr);
@@ -404,25 +408,34 @@
         canvas.height = canvasH;
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Update road Y relative to new height
-      // ROAD_Y stays at proportional position
+      const scrollbar = 16;
+      globalScrollbar = scrollbar;
       globalDpr = dpr;
       globalDisplayW = displayW;
       globalDisplayH = displayH;
-      pixelScale = (displayW - MARGIN * 2) / roadLength;
-      // Re-fix carX
+      globalRoadY = Math.round(displayH * 0.38);
+      globalMargin = Math.round(Math.max(16, Math.min(40, displayW * 0.04)));
+      pixelScale = (displayW - globalMargin * 2) / roadLength;
       if (!isRunning && phase === 'idle') {
-        carX = MARGIN;
+        carX = globalMargin;
       } else {
-        const progress = Math.max(0, Math.min(1, (carX - MARGIN) / (canvas.width / dpr - MARGIN * 2)));
-        carX = MARGIN + progress * (displayW - MARGIN * 2);
+        const oldW = canvas.width / dpr;
+        const progress = Math.max(0, Math.min(1, (carX - MARGIN) / (oldW - MARGIN * 2)));
+        carX = globalMargin + progress * (displayW - globalMargin * 2);
       }
+      // Rebuild wavefronts at new scale
+      wavefronts.forEach(w => { w.x = globalMargin + (w.x - MARGIN) * pixelScale / pixelScale; });
+      MARGIN = globalMargin;
+      ROAD_Y = globalRoadY;
       draw();
     }
 
     let globalDpr = 1;
+    let globalScrollbar = 16;
     let globalDisplayW = 1600;
     let globalDisplayH = 340;
+    let globalRoadY = 120;
+    let globalMargin = 40;
 
     const resizeObserver = new ResizeObserver(() => { resizeCanvas(); });
     resizeObserver.observe(canvas);
@@ -808,7 +821,8 @@
       const y = (event.clientY - rect.top) * scaleY;
       const dx = x - globalDisplayW / 2;
       const dy = y - observerPixelY();
-      if (Math.hypot(dx, dy) <= 28) {
+      const dragRadius = isMobileDevice ? 36 : 28;
+      if (Math.hypot(dx, dy) <= dragRadius) {
         isDraggingObserver = true;
         canvas.setPointerCapture(event.pointerId);
         updateObserverFromPointer(event);
@@ -933,8 +947,12 @@
     let audioFreq = null;
 
     function step(timestamp) {
+      frameSkip = (frameSkip + 1) % (isMobileDevice ? 2 : 1);
+      const skipDraw = frameSkip !== 0;
       let dt = (timestamp - lastTimestamp) / 1000;
       if (!Number.isFinite(dt) || dt < 0 || dt > 0.1) dt = 0.016;
+      // Clamp dt on mobile to prevent spiral of death
+      if (isMobileDevice && dt > 0.05) dt = 0.05;
       lastTimestamp = timestamp;
       if (isPaused) dt = 0;
       visualTime += dt;
@@ -1005,7 +1023,7 @@
 
       waveEmitTimer += dt;
       const avgFreq = soundType === 'ambulance' ? (AMB_LOW + AMB_HIGH) / 2 : f0;
-      const emitInterval = Math.max(0.05, Math.min(0.18, 44 / avgFreq));
+      const emitInterval = Math.max(isMobileDevice ? 0.1 : 0.05, Math.min(0.18, 44 / avgFreq));
       if (waveEmitTimer >= emitInterval) {
         waveEmitTimer = 0;
         wavefronts.push(createWavefront({ birthTime: visualTime, x: carX, v: carVs, sourceTime: isRunning ? simTime : null, sourceFreq: isRunning ? getSourceFreq(simTime) : getSourceFreq(visualTime) }));
@@ -1015,7 +1033,7 @@
         wave.radius = VSOUND * age * pixelScale;
         wave.alpha = Math.max(0.8 - age * 0.18, 0);
       });
-      wavefronts = wavefronts.filter((wave) => wave.alpha > 0.02);
+      wavefronts = wavefronts.filter((wave) => wave.alpha > (isMobileDevice ? 0.08 : 0.02));
 
       const retardedState = getRetardedState(simTime);
       const fObserved = observedFrequency(retardedState);
@@ -1107,7 +1125,7 @@
 
       $('dataTime').innerText = `${simTime.toFixed(2)} s`;
       $('dataCarSpeed').innerHTML = `<span>${carVs.toFixed(1)} m/s</span><span class="text-[10px] font-normal" style="color:var(--text-muted)">${(carVs * 3.6).toFixed(0)} km/hr</span>`;
-      draw();
+      if (!skipDraw) draw();
       requestAnimationFrame(step);
     }
 
@@ -1149,9 +1167,10 @@
 
       ctx.textAlign = 'center';
       ctx.font = '14px monospace';
-      for (let m = 0; m <= roadLength; m += minorTick) {
+      const tickStep = isMobileDevice ? Math.max(minorTick, majorTick) : minorTick;
+      for (let m = 0; m <= roadLength; m += tickStep) {
         const x = MARGIN + m * pixelScale;
-        const major = m % majorTick === 0;
+        const major = tickStep === majorTick || (m % majorTick === 0);
         ctx.strokeStyle = major ? tickMajor : tickMinor;
         ctx.lineWidth = major ? 1.5 : 1;
         ctx.beginPath();
