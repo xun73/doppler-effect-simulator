@@ -52,7 +52,7 @@
       --wave-stroke: rgba(148, 163, 184, 0.8);
       --dash-stroke: rgba(244, 63, 94, 0.32);
     }
-    html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
+    html, body { margin: 0; padding: 0; width: 100%; }
     body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -266,6 +266,9 @@
           </h3>
           <div class="chart-wrap"><canvas id="frequencyChart"></canvas></div>
         </div>
+        <div class="text-right text-[10px] sm:text-xs" style="color:var(--text-muted)">
+          <span data-i18n="credit">臺中市立惠文高中地球科學教師吳秉勳製作</span>
+        </div>
       </section>
     </div>
   </main>
@@ -340,6 +343,7 @@
       targetSpeed: { zh: '目標速度', en: 'Target speed' },
       accelTo: { zh: '加速至', en: 'Accelerating to' },
       decelTo: { zh: '減速至', en: 'Decelerating to' },
+      credit: { zh: '臺中市立惠文高中地球科學教師吳秉勳製作', en: 'Made by Bing-Syun Wu, Earth Science Teacher, Hui-Wen Senior High School' },
     };
 
     function applyTheme() {
@@ -399,8 +403,6 @@
       // Use taller aspect ratio on mobile
       const ratio = isMobile ? 5/3 : 1600/340;
       const displayH = Math.min(displayW / ratio, isMobile ? (window.innerHeight * 0.45) : 340);
-      canvas.style.width = displayW + 'px';
-      canvas.style.height = displayH + 'px';
       canvasW = Math.round(displayW * dpr);
       canvasH = Math.round(displayH * dpr);
       if (canvas.width !== canvasW || canvas.height !== canvasH) {
